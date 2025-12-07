@@ -38,7 +38,7 @@ def demo_srp():
     )
 
     print(f"Flight: {flight.flight_number}")
-    print(f"Route: {flight.origin} → {flight.destination}")
+    print(f"Route: {flight.origin} -> {flight.destination}")
     print(f"Total seats: {flight.total_seats}")
     print(f"Available: {flight.available_seats}")
     print(f"Occupancy: {flight.get_occupancy_rate():.1f}%")
@@ -46,7 +46,7 @@ def demo_srp():
     # Reserve seats
     print("\nReserving 10 seats...")
     if flight.reserve_seat(10):
-        print(f"✓ Reserved successfully. Available now: {flight.available_seats}")
+        print(f"[OK] Reserved successfully. Available now: {flight.available_seats}")
 
     # SRP: Passenger class - ONLY manages passenger profile
     print("\n2. Passenger Entity (Responsibility: Passenger profile)")
@@ -94,18 +94,18 @@ def demo_srp():
     # Process booking lifecycle
     print("\nProcessing booking workflow:")
     booking.mark_as_confirmed()
-    print(f"✓ Confirmed - Status: {booking.status.value}")
+    print(f"[OK] Confirmed - Status: {booking.status.value}")
 
     booking.record_payment(250.0)
-    print(f"✓ Payment recorded - Status: {booking.status.value}")
+    print(f"[OK] Payment recorded - Status: {booking.status.value}")
 
     booking.mark_as_paid()
-    print(f"✓ Paid - Status: {booking.status.value}")
+    print(f"[OK] Paid - Status: {booking.status.value}")
 
     booking.mark_as_checked_in()
-    print(f"✓ Checked in - Status: {booking.status.value}")
+    print(f"[OK] Checked in - Status: {booking.status.value}")
 
-    print("\n✓ SRP Demonstrated: Each entity has ONE clear responsibility!")
+    print("\n[OK] SRP Demonstrated: Each entity has ONE clear responsibility!")
 
 
 if __name__ == "__main__":
