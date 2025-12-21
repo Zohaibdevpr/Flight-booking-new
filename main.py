@@ -1,1003 +1,943 @@
-#!/usr/bin/env python3
-"""
-Interactive Flight Booking System
-A comprehensive flight booking application with flight search, booking, payment processing,
-and JSON data persistence with comprehensive input validation and error handling.
-"""
-
 import json
 import os
 import re
-import uuid
 from datetime import datetime, timedelta
-from pathlib import Path
-from typing import List, Dict, Optional, Tuple
-from enum import Enum
+from typing import Dict, List, Optional, Tuple
 import hashlib
+import random
+import string
 
+# ==================== DATA PERSISTENCE ====================
 
-class BookingStatus(Enum):
-    """Enumeration for booking statuses"""
-    PENDING = "PENDING"
-    CONFIRMED = "CONFIRMED"
-    CANCELLED = "CANCELLED"
-    COMPLETED = "COMPLETED"
-
-
-class PaymentMethod(Enum):
-    """Enumeration for payment methods"""
-    CREDIT_CARD = "CREDIT_CARD"
-    DEBIT_CARD = "DEBIT_CARD"
-    PAYPAL = "PAYPAL"
-    BANK_TRANSFER = "BANK_TRANSFER"
-
-
-class Database:
-    """Handles JSON data persistence"""
+class DataManager:
+    """Manages persistent data storage using JSON files"""
     
-    def __init__(self, data_dir: str = "data"):
-        """Initialize database with specified directory"""
-        self.data_dir = Path(data_dir)
-        self.data_dir.mkdir(exist_ok=True)
-        
-        self.flights_file = self.data_dir / "flights.json"
-        self.bookings_file = self.data_dir / "bookings.json"
-        self.users_file = self.data_dir / "users.json"
-        self.payments_file = self.data_dir / "payments.json"
-        
-        self._initialize_data()
+    FLIGHTS_FILE = "flights_data.json"
+    BOOKINGS_FILE = "bookings_data.json"
     
-    def _initialize_data(self):
-        """Initialize data files if they don't exist"""
-        if not self.flights_file.exists():
-            self._create_sample_flights()
-        
-        if not self.bookings_file.exists():
-            self._write_json(self.bookings_file, [])
-        
-        if not self.users_file.exists():
-            self._write_json(self.users_file, [])
-        
-        if not self.payments_file.exists():
-            self._write_json(self.payments_file, [])
+    @staticmethod
+    def load_flights() -> List[Dict]:
+        """Load flights from JSON file"""
+        if os.path.exists(DataManager.FLIGHTS_FILE):
+            try:
+                with open(DataManager.FLIGHTS_FILE, 'r') as f:
+                    return json.load(f)
+            except (json.JSONDecodeError, IOError):
+                return DataManager.get_default_flights()
+        return DataManager.get_default_flights()
     
-    def _create_sample_flights(self):
-        """Create sample flight data"""
-        sample_flights = [
+    @staticmethod
+    def get_default_flights() -> List[Dict]:
+        """Return default flights data"""
+        return [
             {
-                "id": "FL001",
-                "airline": "Sky Airways",
+                "flight_id": "FL001",
+                "airline": "SkyWings Airlines",
                 "departure_city": "New York",
                 "arrival_city": "Los Angeles",
-                "departure_time": "2025-12-25 08:00:00",
-                "arrival_time": "2025-12-25 11:30:00",
-                "duration_minutes": 330,
-                "price": 299.99,
-                "available_seats": 150,
-                "total_seats": 180,
-                "aircraft": "Boeing 737"
+                "departure_time": "2025-12-25 08:00",
+                "arrival_time": "2025-12-25 11:30",
+                "duration": "5h 30m",
+                "price": 250.00,
+                "available_seats": 50,
+                "total_seats": 100
             },
             {
-                "id": "FL002",
-                "airline": "Global Air",
+                "flight_id": "FL002",
+                "airline": "AeroConnect",
                 "departure_city": "New York",
-                "arrival_city": "Los Angeles",
-                "departure_time": "2025-12-25 14:00:00",
-                "arrival_time": "2025-12-25 17:45:00",
-                "duration_minutes": 345,
-                "price": 279.99,
-                "available_seats": 45,
-                "total_seats": 180,
-                "aircraft": "Airbus A320"
+                "arrival_city": "Chicago",
+                "departure_time": "2025-12-25 10:00",
+                "arrival_time": "2025-12-25 13:00",
+                "duration": "3h",
+                "price": 180.00,
+                "available_seats": 30,
+                "total_seats": 100
             },
             {
-                "id": "FL003",
-                "airline": "Sky Airways",
-                "departure_city": "New York",
+                "flight_id": "FL003",
+                "airline": "SkyWings Airlines",
+                "departure_city": "Los Angeles",
                 "arrival_city": "Miami",
-                "departure_time": "2025-12-25 10:30:00",
-                "arrival_time": "2025-12-25 13:15:00",
-                "duration_minutes": 165,
-                "price": 199.99,
-                "available_seats": 75,
-                "total_seats": 150,
-                "aircraft": "Boeing 737"
+                "departure_time": "2025-12-26 14:00",
+                "arrival_time": "2025-12-26 20:00",
+                "duration": "4h 30m",
+                "price": 220.00,
+                "available_seats": 45,
+                "total_seats": 100
             },
             {
-                "id": "FL004",
-                "airline": "Premium Airlines",
-                "departure_city": "Los Angeles",
-                "arrival_city": "Chicago",
-                "departure_time": "2025-12-26 09:00:00",
-                "arrival_time": "2025-12-26 16:30:00",
-                "duration_minutes": 330,
-                "price": 349.99,
-                "available_seats": 20,
-                "total_seats": 180,
-                "aircraft": "Boeing 777"
+                "flight_id": "FL004",
+                "airline": "CloudJet",
+                "departure_city": "Chicago",
+                "arrival_city": "Miami",
+                "departure_time": "2025-12-25 16:00",
+                "arrival_time": "2025-12-25 22:00",
+                "duration": "5h",
+                "price": 200.00,
+                "available_seats": 25,
+                "total_seats": 100
             },
             {
-                "id": "FL005",
-                "airline": "Budget Airlines",
+                "flight_id": "FL005",
+                "airline": "AeroConnect",
                 "departure_city": "Los Angeles",
-                "arrival_city": "Chicago",
-                "departure_time": "2025-12-26 18:00:00",
-                "arrival_time": "2025-12-27 01:30:00",
-                "duration_minutes": 330,
-                "price": 149.99,
-                "available_seats": 120,
-                "total_seats": 150,
-                "aircraft": "Airbus A319"
+                "arrival_city": "New York",
+                "departure_time": "2025-12-27 09:00",
+                "arrival_time": "2025-12-27 17:00",
+                "duration": "5h 30m",
+                "price": 260.00,
+                "available_seats": 60,
+                "total_seats": 100
             }
         ]
-        self._write_json(self.flights_file, sample_flights)
     
-    def _read_json(self, filepath: Path) -> List[Dict]:
-        """Read JSON file safely"""
+    @staticmethod
+    def save_flights(flights: List[Dict]) -> bool:
+        """Save flights to JSON file"""
         try:
-            if filepath.exists():
-                with open(filepath, 'r') as f:
-                    return json.load(f)
-            return []
-        except json.JSONDecodeError:
-            print(f"Error: Corrupted JSON file at {filepath}")
-            return []
-    
-    def _write_json(self, filepath: Path, data):
-        """Write JSON file safely"""
-        try:
-            with open(filepath, 'w') as f:
-                json.dump(data, f, indent=2)
+            with open(DataManager.FLIGHTS_FILE, 'w') as f:
+                json.dump(flights, f, indent=2)
+            return True
         except IOError as e:
-            raise Exception(f"Error writing to {filepath}: {str(e)}")
+            print(f"Error saving flights: {e}")
+            return False
     
-    def get_all_flights(self) -> List[Dict]:
-        """Retrieve all flights"""
-        return self._read_json(self.flights_file)
+    @staticmethod
+    def load_bookings() -> List[Dict]:
+        """Load bookings from JSON file"""
+        if os.path.exists(DataManager.BOOKINGS_FILE):
+            try:
+                with open(DataManager.BOOKINGS_FILE, 'r') as f:
+                    return json.load(f)
+            except (json.JSONDecodeError, IOError):
+                return []
+        return []
     
-    def get_flight_by_id(self, flight_id: str) -> Optional[Dict]:
-        """Retrieve a specific flight"""
-        flights = self.get_all_flights()
-        return next((f for f in flights if f["id"] == flight_id), None)
-    
-    def update_flight(self, flight_id: str, updates: Dict):
-        """Update flight information"""
-        flights = self.get_all_flights()
-        for flight in flights:
-            if flight["id"] == flight_id:
-                flight.update(updates)
-                self._write_json(self.flights_file, flights)
-                return True
-        return False
-    
-    def save_booking(self, booking: Dict) -> bool:
-        """Save a new booking"""
-        bookings = self._read_json(self.bookings_file)
-        bookings.append(booking)
-        self._write_json(self.bookings_file, bookings)
-        return True
-    
-    def get_booking_by_id(self, booking_id: str) -> Optional[Dict]:
-        """Retrieve a specific booking"""
-        bookings = self._read_json(self.bookings_file)
-        return next((b for b in bookings if b["id"] == booking_id), None)
-    
-    def update_booking(self, booking_id: str, updates: Dict) -> bool:
-        """Update booking information"""
-        bookings = self._read_json(self.bookings_file)
-        for booking in bookings:
-            if booking["id"] == booking_id:
-                booking.update(updates)
-                self._write_json(self.bookings_file, bookings)
-                return True
-        return False
-    
-    def get_user_bookings(self, email: str) -> List[Dict]:
-        """Retrieve all bookings for a user"""
-        bookings = self._read_json(self.bookings_file)
-        return [b for b in bookings if b.get("passenger_email") == email]
-    
-    def save_payment(self, payment: Dict) -> bool:
-        """Save payment record"""
-        payments = self._read_json(self.payments_file)
-        payments.append(payment)
-        self._write_json(self.payments_file, payments)
-        return True
-    
-    def get_payment_by_booking_id(self, booking_id: str) -> Optional[Dict]:
-        """Retrieve payment for a booking"""
-        payments = self._read_json(self.payments_file)
-        return next((p for p in payments if p["booking_id"] == booking_id), None)
+    @staticmethod
+    def save_bookings(bookings: List[Dict]) -> bool:
+        """Save bookings to JSON file"""
+        try:
+            with open(DataManager.BOOKINGS_FILE, 'w') as f:
+                json.dump(bookings, f, indent=2)
+            return True
+        except IOError as e:
+            print(f"Error saving bookings: {e}")
+            return False
 
+
+# ==================== INPUT VALIDATION ====================
 
 class Validator:
-    """Input validation utilities"""
-    
-    @staticmethod
-    def validate_email(email: str) -> Tuple[bool, str]:
-        """Validate email format"""
-        pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-        if re.match(pattern, email):
-            return True, ""
-        return False, "Invalid email format"
-    
-    @staticmethod
-    def validate_phone(phone: str) -> Tuple[bool, str]:
-        """Validate phone number"""
-        phone = phone.replace("-", "").replace(" ", "").replace("(", "").replace(")", "")
-        if len(phone) < 10 or len(phone) > 15 or not phone.isdigit():
-            return False, "Phone number must be 10-15 digits"
-        return True, ""
+    """Handles all input validation"""
     
     @staticmethod
     def validate_name(name: str) -> Tuple[bool, str]:
         """Validate passenger name"""
-        if len(name.strip()) < 2:
+        name = name.strip()
+        if not name:
+            return False, "Name cannot be empty"
+        if len(name) < 2:
             return False, "Name must be at least 2 characters long"
-        if not all(c.isalpha() or c.isspace() for c in name):
-            return False, "Name can only contain letters and spaces"
-        return True, ""
+        if len(name) > 50:
+            return False, "Name must not exceed 50 characters"
+        if not re.match(r"^[a-zA-Z\s'-]+$", name):
+            return False, "Name can only contain letters, spaces, hyphens, and apostrophes"
+        return True, "Valid"
     
     @staticmethod
-    def validate_date(date_str: str) -> Tuple[bool, str]:
-        """Validate date format (YYYY-MM-DD)"""
+    def validate_email(email: str) -> Tuple[bool, str]:
+        """Validate email address"""
+        email = email.strip().lower()
+        pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+        if not re.match(pattern, email):
+            return False, "Invalid email format"
+        if len(email) > 100:
+            return False, "Email is too long"
+        return True, "Valid"
+    
+    @staticmethod
+    def validate_phone(phone: str) -> Tuple[bool, str]:
+        """Validate phone number"""
+        phone = phone.strip()
+        # Remove common separators
+        phone_cleaned = re.sub(r'[\s\-\(\)\.+]', '', phone)
+        if not phone_cleaned.isdigit():
+            return False, "Phone must contain only digits and optional separators"
+        if len(phone_cleaned) < 7:
+            return False, "Phone number is too short"
+        if len(phone_cleaned) > 15:
+            return False, "Phone number is too long"
+        return True, "Valid"
+    
+    @staticmethod
+    def validate_passport(passport: str) -> Tuple[bool, str]:
+        """Validate passport number"""
+        passport = passport.strip().upper()
+        if not passport:
+            return False, "Passport number cannot be empty"
+        if len(passport) < 5:
+            return False, "Passport number is too short"
+        if len(passport) > 20:
+            return False, "Passport number is too long"
+        if not re.match(r'^[A-Z0-9]+$', passport):
+            return False, "Passport can only contain letters and numbers"
+        return True, "Valid"
+    
+    @staticmethod
+    def validate_date(date_str: str, date_format: str = "%Y-%m-%d") -> Tuple[bool, str]:
+        """Validate date format and value"""
         try:
-            datetime.strptime(date_str, "%Y-%m-%d")
-            return True, ""
+            date_obj = datetime.strptime(date_str, date_format)
+            return True, "Valid"
         except ValueError:
-            return False, "Invalid date format. Use YYYY-MM-DD"
+            return False, f"Invalid date format. Expected {date_format}"
     
     @staticmethod
-    def validate_credit_card(card_number: str) -> Tuple[bool, str]:
-        """Validate credit card using Luhn algorithm"""
-        card_number = card_number.replace(" ", "").replace("-", "")
+    def validate_dob(dob_str: str) -> Tuple[bool, str]:
+        """Validate date of birth"""
+        is_valid, msg = Validator.validate_date(dob_str, "%Y-%m-%d")
+        if not is_valid:
+            return False, msg
         
-        if not card_number.isdigit() or len(card_number) < 13 or len(card_number) > 19:
-            return False, "Invalid card number length"
+        try:
+            dob = datetime.strptime(dob_str, "%Y-%m-%d")
+            age = (datetime.now() - dob).days // 365
+            if age < 0:
+                return False, "Date of birth cannot be in the future"
+            if age < 1:
+                return False, "Passenger must be at least 1 year old"
+            if age > 150:
+                return False, "Invalid age"
+            return True, "Valid"
+        except ValueError:
+            return False, "Invalid date of birth"
+    
+    @staticmethod
+    def validate_card_number(card_number: str) -> Tuple[bool, str]:
+        """Validate credit card number using Luhn algorithm"""
+        card_number = card_number.strip().replace(" ", "").replace("-", "")
+        
+        if not card_number.isdigit():
+            return False, "Card number must contain only digits"
+        
+        if len(card_number) < 13 or len(card_number) > 19:
+            return False, "Card number must be between 13 and 19 digits"
         
         # Luhn algorithm
         total = 0
-        for i, digit in enumerate(reversed(card_number)):
-            n = int(digit)
+        reverse_digits = card_number[::-1]
+        for i, digit in enumerate(reverse_digits):
+            d = int(digit)
             if i % 2 == 1:
-                n *= 2
-                if n > 9:
-                    n -= 9
-            total += n
+                d *= 2
+                if d > 9:
+                    d -= 9
+            total += d
         
         if total % 10 != 0:
-            return False, "Invalid card number (failed Luhn check)"
+            return False, "Invalid card number"
         
-        return True, ""
+        return True, "Valid"
     
     @staticmethod
-    def validate_cvv(cvv: str) -> Tuple[bool, str]:
-        """Validate CVV"""
-        if not cvv.isdigit() or len(cvv) < 3 or len(cvv) > 4:
-            return False, "CVV must be 3-4 digits"
-        return True, ""
-    
-    @staticmethod
-    def validate_expiry(expiry_date: str) -> Tuple[bool, str]:
-        """Validate card expiry date (MM/YY)"""
+    def validate_expiry(expiry_str: str) -> Tuple[bool, str]:
+        """Validate card expiry date (MM/YY format)"""
+        expiry = expiry_str.strip()
+        if not re.match(r'^\d{2}/\d{2}$', expiry):
+            return False, "Expiry must be in MM/YY format"
+        
         try:
-            month, year = expiry_date.split("/")
+            month, year = expiry.split('/')
             month = int(month)
             year = int(year)
             
             if month < 1 or month > 12:
                 return False, "Invalid month"
             
-            current_date = datetime.now()
-            current_year = current_date.year % 100
+            # Assuming 2000s
+            expiry_date = datetime(2000 + year, month, 1)
+            if expiry_date < datetime.now():
+                return False, "Card is expired"
             
-            if year < current_year or (year == current_year and month < current_date.month):
-                return False, "Card has expired"
-            
-            return True, ""
+            return True, "Valid"
         except (ValueError, IndexError):
-            return False, "Invalid expiry format. Use MM/YY"
+            return False, "Invalid expiry format"
+    
+    @staticmethod
+    def validate_cvv(cvv: str) -> Tuple[bool, str]:
+        """Validate CVV"""
+        cvv = cvv.strip()
+        if not cvv.isdigit():
+            return False, "CVV must contain only digits"
+        if len(cvv) not in [3, 4]:
+            return False, "CVV must be 3 or 4 digits"
+        return True, "Valid"
 
 
-class PaymentProcessor:
-    """Handles payment processing"""
+# ==================== FLIGHT SEARCH ====================
+
+class FlightSearch:
+    """Handles flight searching and filtering"""
     
-    def __init__(self, database: Database):
-        self.database = database
-        self.validator = Validator()
+    def __init__(self, flights: List[Dict]):
+        self.flights = flights
     
-    def process_payment(self, booking_id: str, amount: float, payment_method: str,
-                       card_details: Optional[Dict] = None) -> Tuple[bool, str, Optional[str]]:
+    def search(self, departure: str, arrival: str, date: str) -> List[Dict]:
         """
-        Process payment for a booking
-        Returns: (success, message, transaction_id)
+        Search for flights based on criteria
+        Args:
+            departure: Departure city
+            arrival: Arrival city
+            date: Travel date (YYYY-MM-DD)
         """
-        try:
-            # Validate amount
-            if amount <= 0:
-                return False, "Invalid amount", None
-            
-            payment_method_obj = PaymentMethod[payment_method.upper()]
-            
-            # Process based on payment method
-            if payment_method_obj == PaymentMethod.CREDIT_CARD or payment_method_obj == PaymentMethod.DEBIT_CARD:
-                success, msg = self._process_card_payment(card_details)
-                if not success:
-                    return False, msg, None
-            elif payment_method_obj == PaymentMethod.PAYPAL:
-                success, msg = self._process_paypal_payment(card_details)
-                if not success:
-                    return False, msg, None
-            elif payment_method_obj == PaymentMethod.BANK_TRANSFER:
-                success, msg = self._process_bank_transfer(card_details)
-                if not success:
-                    return False, msg, None
-            
-            # Generate transaction ID
-            transaction_id = str(uuid.uuid4())[:8].upper()
-            
-            # Save payment record
-            payment_record = {
-                "booking_id": booking_id,
-                "amount": amount,
-                "payment_method": payment_method,
-                "transaction_id": transaction_id,
-                "status": "COMPLETED",
-                "timestamp": datetime.now().isoformat(),
-                "card_last_four": card_details.get("card_number", "")[-4:] if card_details else "N/A"
-            }
-            
-            self.database.save_payment(payment_record)
-            
-            return True, f"Payment processed successfully. Transaction ID: {transaction_id}", transaction_id
+        departure = departure.strip().lower()
+        arrival = arrival.strip().lower()
         
-        except KeyError:
-            return False, "Invalid payment method", None
-        except Exception as e:
-            return False, f"Payment processing error: {str(e)}", None
+        results = []
+        for flight in self.flights:
+            if (flight['departure_city'].lower() == departure and
+                flight['arrival_city'].lower() == arrival and
+                flight['departure_time'].startswith(date) and
+                flight['available_seats'] > 0):
+                results.append(flight)
+        
+        return results
     
-    def _process_card_payment(self, card_details: Dict) -> Tuple[bool, str]:
-        """Process credit/debit card payment"""
-        if not card_details:
-            return False, "Card details required"
-        
-        # Validate card number
-        valid, msg = self.validator.validate_credit_card(card_details.get("card_number", ""))
-        if not valid:
-            return False, msg
-        
-        # Validate CVV
-        valid, msg = self.validator.validate_cvv(card_details.get("cvv", ""))
-        if not valid:
-            return False, msg
-        
-        # Validate expiry
-        valid, msg = self.validator.validate_expiry(card_details.get("expiry_date", ""))
-        if not valid:
-            return False, msg
-        
-        # Simulate payment processing
-        import random
-        if random.random() > 0.95:  # 5% failure rate simulation
-            return False, "Card declined by issuer"
-        
-        return True, "Card payment successful"
-    
-    def _process_paypal_payment(self, paypal_details: Dict) -> Tuple[bool, str]:
-        """Process PayPal payment"""
-        if not paypal_details or "email" not in paypal_details:
-            return False, "PayPal email required"
-        
-        valid, msg = self.validator.validate_email(paypal_details["email"])
-        if not valid:
-            return False, "Invalid PayPal email"
-        
-        import random
-        if random.random() > 0.98:
-            return False, "PayPal payment failed"
-        
-        return True, "PayPal payment successful"
-    
-    def _process_bank_transfer(self, bank_details: Dict) -> Tuple[bool, str]:
-        """Process bank transfer"""
-        if not bank_details or "account_number" not in bank_details:
-            return False, "Bank account details required"
-        
-        if not bank_details["account_number"].replace(" ", "").isdigit():
-            return False, "Invalid account number"
-        
-        return True, "Bank transfer initiated successfully"
+    def get_all_cities(self) -> set:
+        """Get all available cities"""
+        cities = set()
+        for flight in self.flights:
+            cities.add(flight['departure_city'])
+            cities.add(flight['arrival_city'])
+        return sorted(list(cities))
 
 
-class FlightBookingSystem:
-    """Main flight booking system"""
+# ==================== PASSENGER DETAILS ====================
+
+class PassengerDetails:
+    """Manages passenger information"""
     
     def __init__(self):
-        self.database = Database()
-        self.payment_processor = PaymentProcessor(self.database)
-        self.validator = Validator()
-        self.current_user = None
+        self.passengers: List[Dict] = []
     
-    def search_flights(self, departure: str, arrival: str, date: str) -> List[Dict]:
-        """
-        Search for available flights
-        Returns list of matching flights
-        """
-        try:
-            # Validate date
-            valid, msg = self.validator.validate_date(date)
-            if not valid:
-                print(f"Error: {msg}")
-                return []
-            
-            # Normalize city names
-            departure = departure.strip().title()
-            arrival = arrival.strip().title()
-            
-            if departure == arrival:
-                print("Error: Departure and arrival cities must be different")
-                return []
-            
-            all_flights = self.database.get_all_flights()
-            
-            # Filter flights
-            matching_flights = [
-                f for f in all_flights
-                if f["departure_city"].title() == departure and
-                   f["arrival_city"].title() == arrival and
-                   f["available_seats"] > 0 and
-                   f["departure_time"].startswith(date)
-            ]
-            
-            return matching_flights
+    def add_passenger(self, name: str, email: str, phone: str, 
+                     dob: str, passport: str, seat_number: Optional[str] = None) -> bool:
+        """Add a new passenger with validation"""
+        # Validate all inputs
+        validations = [
+            (Validator.validate_name(name), "Name"),
+            (Validator.validate_email(email), "Email"),
+            (Validator.validate_phone(phone), "Phone"),
+            (Validator.validate_dob(dob), "Date of Birth"),
+            (Validator.validate_passport(passport), "Passport")
+        ]
         
-        except Exception as e:
-            print(f"Search error: {str(e)}")
-            return []
-    
-    def display_flights(self, flights: List[Dict]):
-        """Display flights in a formatted table"""
-        if not flights:
-            print("No flights found matching your criteria.")
-            return
+        for (is_valid, msg), field in validations:
+            if not is_valid:
+                print(f"❌ {field} validation failed: {msg}")
+                return False
         
-        print("\n" + "="*120)
-        print(f"{'Flight ID':<12} {'Airline':<20} {'Departure':<25} {'Arrival':<25} {'Duration':<12} {'Price':<10} {'Seats':<8}")
-        print("="*120)
+        # Auto-assign seat if not provided
+        if not seat_number:
+            seat_number = f"A{len(self.passengers) + 1}"
         
-        for flight in flights:
-            print(f"{flight['id']:<12} {flight['airline']:<20} {flight['departure_time']:<25} "
-                  f"{flight['arrival_time']:<25} {flight['duration_minutes']//60}h{flight['duration_minutes']%60}m{'':<4} "
-                  f"${flight['price']:<9.2f} {flight['available_seats']:<8}")
-        
-        print("="*120 + "\n")
-    
-    def get_flight_details(self, flight_id: str) -> Optional[Dict]:
-        """Get detailed information about a flight"""
-        flight = self.database.get_flight_by_id(flight_id)
-        
-        if flight:
-            print("\n" + "="*60)
-            print("FLIGHT DETAILS")
-            print("="*60)
-            for key, value in flight.items():
-                if key == "duration_minutes":
-                    hours = value // 60
-                    minutes = value % 60
-                    print(f"{key.replace('_', ' ').title():<25}: {hours}h {minutes}m")
-                elif key == "price":
-                    print(f"{key.replace('_', ' ').title():<25}: ${value:.2f}")
-                else:
-                    print(f"{key.replace('_', ' ').title():<25}: {value}")
-            print("="*60 + "\n")
-        
-        return flight
-    
-    def create_booking(self, flight_id: str, passenger_name: str, passenger_email: str,
-                      passenger_phone: str, num_passengers: int) -> Optional[str]:
-        """
-        Create a new booking
-        Returns booking ID if successful
-        """
-        try:
-            # Validate inputs
-            valid, msg = self.validator.validate_name(passenger_name)
-            if not valid:
-                print(f"Error: {msg}")
-                return None
-            
-            valid, msg = self.validator.validate_email(passenger_email)
-            if not valid:
-                print(f"Error: {msg}")
-                return None
-            
-            valid, msg = self.validator.validate_phone(passenger_phone)
-            if not valid:
-                print(f"Error: {msg}")
-                return None
-            
-            if num_passengers < 1 or num_passengers > 9:
-                print("Error: Number of passengers must be between 1 and 9")
-                return None
-            
-            # Check flight availability
-            flight = self.database.get_flight_by_id(flight_id)
-            if not flight:
-                print("Error: Flight not found")
-                return None
-            
-            if flight["available_seats"] < num_passengers:
-                print(f"Error: Only {flight['available_seats']} seats available")
-                return None
-            
-            # Create booking
-            booking_id = str(uuid.uuid4())[:8].upper()
-            total_price = flight["price"] * num_passengers
-            
-            booking = {
-                "id": booking_id,
-                "flight_id": flight_id,
-                "passenger_name": passenger_name,
-                "passenger_email": passenger_email,
-                "passenger_phone": passenger_phone,
-                "num_passengers": num_passengers,
-                "total_price": total_price,
-                "status": BookingStatus.PENDING.value,
-                "booking_date": datetime.now().isoformat(),
-                "confirmation_number": hashlib.md5(booking_id.encode()).hexdigest()[:12].upper()
-            }
-            
-            # Save booking
-            self.database.save_booking(booking)
-            
-            # Update available seats
-            self.database.update_flight(flight_id, {
-                "available_seats": flight["available_seats"] - num_passengers
-            })
-            
-            print(f"\nBooking created successfully!")
-            print(f"Booking ID: {booking_id}")
-            print(f"Confirmation Number: {booking['confirmation_number']}")
-            print(f"Total Price: ${total_price:.2f}")
-            
-            return booking_id
-        
-        except Exception as e:
-            print(f"Booking error: {str(e)}")
-            return None
-    
-    def process_booking_payment(self, booking_id: str, payment_method: str) -> Tuple[bool, str]:
-        """
-        Process payment for a booking
-        Returns: (success, message)
-        """
-        try:
-            # Get booking
-            booking = self.database.get_booking_by_id(booking_id)
-            if not booking:
-                return False, "Booking not found"
-            
-            if booking["status"] != BookingStatus.PENDING.value:
-                return False, f"Booking status is {booking['status']}, cannot process payment"
-            
-            amount = booking["total_price"]
-            
-            # Get payment details based on method
-            card_details = self._get_payment_details(payment_method)
-            if not card_details:
-                return False, "Payment cancelled"
-            
-            # Process payment
-            success, msg, transaction_id = self.payment_processor.process_payment(
-                booking_id, amount, payment_method, card_details
-            )
-            
-            if success:
-                # Update booking status
-                self.database.update_booking(booking_id, {
-                    "status": BookingStatus.CONFIRMED.value,
-                    "transaction_id": transaction_id
-                })
-                
-                # Display confirmation
-                self._display_booking_confirmation(booking, transaction_id)
-                return True, msg
-            else:
-                return False, msg
-        
-        except Exception as e:
-            return False, f"Payment error: {str(e)}"
-    
-    def _get_payment_details(self, payment_method: str) -> Optional[Dict]:
-        """Get payment details from user"""
-        print("\n" + "="*60)
-        print("PAYMENT DETAILS")
-        print("="*60)
-        
-        try:
-            payment_method = PaymentMethod[payment_method.upper()]
-            
-            if payment_method == PaymentMethod.CREDIT_CARD or payment_method == PaymentMethod.DEBIT_CARD:
-                print("Enter Credit Card Details:")
-                
-                while True:
-                    card_number = input("Card Number (16 digits): ").strip()
-                    valid, msg = self.validator.validate_credit_card(card_number)
-                    if valid:
-                        break
-                    print(f"Invalid: {msg}. Please try again.")
-                
-                while True:
-                    cardholder_name = input("Cardholder Name: ").strip()
-                    valid, msg = self.validator.validate_name(cardholder_name)
-                    if valid:
-                        break
-                    print(f"Invalid: {msg}. Please try again.")
-                
-                while True:
-                    expiry_date = input("Expiry Date (MM/YY): ").strip()
-                    valid, msg = self.validator.validate_expiry(expiry_date)
-                    if valid:
-                        break
-                    print(f"Invalid: {msg}. Please try again.")
-                
-                while True:
-                    cvv = input("CVV (3-4 digits): ").strip()
-                    valid, msg = self.validator.validate_cvv(cvv)
-                    if valid:
-                        break
-                    print(f"Invalid: {msg}. Please try again.")
-                
-                return {
-                    "card_number": card_number,
-                    "cardholder_name": cardholder_name,
-                    "expiry_date": expiry_date,
-                    "cvv": cvv
-                }
-            
-            elif payment_method == PaymentMethod.PAYPAL:
-                print("PayPal Payment:")
-                
-                while True:
-                    email = input("PayPal Email: ").strip()
-                    valid, msg = self.validator.validate_email(email)
-                    if valid:
-                        break
-                    print(f"Invalid: {msg}. Please try again.")
-                
-                return {"email": email}
-            
-            elif payment_method == PaymentMethod.BANK_TRANSFER:
-                print("Bank Transfer Details:")
-                account_number = input("Account Number: ").strip()
-                routing_number = input("Routing Number: ").strip()
-                
-                return {
-                    "account_number": account_number,
-                    "routing_number": routing_number
-                }
-        
-        except KeyError:
-            print("Invalid payment method")
-            return None
-        except KeyboardInterrupt:
-            print("\nPayment cancelled")
-            return None
-    
-    def _display_booking_confirmation(self, booking: Dict, transaction_id: str):
-        """Display booking confirmation"""
-        flight = self.database.get_flight_by_id(booking["flight_id"])
-        
-        print("\n" + "="*70)
-        print("BOOKING CONFIRMATION".center(70))
-        print("="*70)
-        print(f"Confirmation Number: {booking['confirmation_number']}")
-        print(f"Booking ID: {booking['id']}")
-        print(f"Transaction ID: {transaction_id}")
-        print(f"Status: {booking['status']}")
-        print("-"*70)
-        print(f"Passenger Name: {booking['passenger_name']}")
-        print(f"Email: {booking['passenger_email']}")
-        print(f"Phone: {booking['passenger_phone']}")
-        print(f"Number of Passengers: {booking['num_passengers']}")
-        print("-"*70)
-        print(f"Flight: {flight['airline']}")
-        print(f"Route: {flight['departure_city']} → {flight['arrival_city']}")
-        print(f"Departure: {flight['departure_time']}")
-        print(f"Arrival: {flight['arrival_time']}")
-        print(f"Aircraft: {flight['aircraft']}")
-        print("-"*70)
-        print(f"Total Amount Paid: ${booking['total_price']:.2f}")
-        print(f"Booking Date: {booking['booking_date']}")
-        print("="*70)
-        print("\nA confirmation email has been sent to your email address.")
-        print("Please arrive at the airport 2 hours before departure.\n")
-    
-    def view_booking(self, booking_id: str) -> bool:
-        """View booking details"""
-        booking = self.database.get_booking_by_id(booking_id)
-        
-        if not booking:
-            print("Booking not found")
-            return False
-        
-        flight = self.database.get_flight_by_id(booking["flight_id"])
-        payment = self.database.get_payment_by_booking_id(booking_id)
-        
-        print("\n" + "="*70)
-        print("BOOKING DETAILS".center(70))
-        print("="*70)
-        print(f"Booking ID: {booking['id']}")
-        print(f"Confirmation Number: {booking['confirmation_number']}")
-        print(f"Status: {booking['status']}")
-        print("-"*70)
-        print(f"Passenger: {booking['passenger_name']}")
-        print(f"Email: {booking['passenger_email']}")
-        print(f"Phone: {booking['passenger_phone']}")
-        print(f"Number of Passengers: {booking['num_passengers']}")
-        print("-"*70)
-        print(f"Flight: {flight['airline']} ({flight['id']})")
-        print(f"From: {flight['departure_city']} ({flight['departure_time']})")
-        print(f"To: {flight['arrival_city']} ({flight['arrival_time']})")
-        print(f"Aircraft: {flight['aircraft']}")
-        print("-"*70)
-        
-        if payment:
-            print(f"Payment Method: {payment['payment_method']}")
-            print(f"Transaction ID: {payment['transaction_id']}")
-            print(f"Card Last 4: {payment['card_last_four']}")
-        
-        print(f"Total Price: ${booking['total_price']:.2f}")
-        print(f"Booked On: {booking['booking_date']}")
-        print("="*70 + "\n")
-        
-        return True
-    
-    def cancel_booking(self, booking_id: str) -> bool:
-        """Cancel a booking"""
-        booking = self.database.get_booking_by_id(booking_id)
-        
-        if not booking:
-            print("Booking not found")
-            return False
-        
-        if booking["status"] == BookingStatus.CANCELLED.value:
-            print("Booking is already cancelled")
-            return False
-        
-        # Refund logic
-        refund_amount = booking["total_price"] * 0.8  # 20% cancellation fee
-        
-        # Update booking
-        self.database.update_booking(booking_id, {
-            "status": BookingStatus.CANCELLED.value,
-            "cancellation_date": datetime.now().isoformat(),
-            "refund_amount": refund_amount
-        })
-        
-        # Restore seats
-        flight = self.database.get_flight_by_id(booking["flight_id"])
-        self.database.update_flight(booking["flight_id"], {
-            "available_seats": flight["available_seats"] + booking["num_passengers"]
-        })
-        
-        print(f"\nBooking {booking_id} cancelled successfully!")
-        print(f"Refund Amount: ${refund_amount:.2f} (20% cancellation fee applied)")
-        print("Refund will be processed within 5-7 business days.\n")
-        
-        return True
-    
-    def run_interactive(self):
-        """Run the interactive booking system"""
-        print("\n" + "="*70)
-        print("WELCOME TO FLIGHT BOOKING SYSTEM".center(70))
-        print("="*70 + "\n")
-        
-        while True:
-            print("\n" + "-"*70)
-            print("MAIN MENU")
-            print("-"*70)
-            print("1. Search Flights")
-            print("2. View Flight Details")
-            print("3. Book a Flight")
-            print("4. Make Payment")
-            print("5. View Booking")
-            print("6. Cancel Booking")
-            print("7. Exit")
-            print("-"*70)
-            
-            choice = input("Enter your choice (1-7): ").strip()
-            
-            if choice == "1":
-                self._search_menu()
-            elif choice == "2":
-                self._flight_details_menu()
-            elif choice == "3":
-                self._booking_menu()
-            elif choice == "4":
-                self._payment_menu()
-            elif choice == "5":
-                self._view_booking_menu()
-            elif choice == "6":
-                self._cancel_booking_menu()
-            elif choice == "7":
-                print("\nThank you for using Flight Booking System. Goodbye!\n")
-                break
-            else:
-                print("Invalid choice. Please try again.")
-    
-    def _search_menu(self):
-        """Flight search menu"""
-        print("\n" + "-"*70)
-        print("FLIGHT SEARCH")
-        print("-"*70)
-        
-        try:
-            departure = input("Departure City: ").strip()
-            arrival = input("Arrival City: ").strip()
-            date = input("Travel Date (YYYY-MM-DD): ").strip()
-            
-            flights = self.search_flights(departure, arrival, date)
-            
-            if flights:
-                print(f"\nFound {len(flights)} flight(s):")
-                self.display_flights(flights)
-            else:
-                print("No flights found.")
-        
-        except KeyboardInterrupt:
-            print("\nSearch cancelled")
-        except Exception as e:
-            print(f"Error: {str(e)}")
-    
-    def _flight_details_menu(self):
-        """Flight details menu"""
-        print("\n" + "-"*70)
-        print("VIEW FLIGHT DETAILS")
-        print("-"*70)
-        
-        try:
-            flight_id = input("Enter Flight ID: ").strip().upper()
-            self.get_flight_details(flight_id)
-        
-        except KeyboardInterrupt:
-            print("\nCancelled")
-        except Exception as e:
-            print(f"Error: {str(e)}")
-    
-    def _booking_menu(self):
-        """Booking menu"""
-        print("\n" + "-"*70)
-        print("CREATE BOOKING")
-        print("-"*70)
-        
-        try:
-            flight_id = input("Flight ID: ").strip().upper()
-            passenger_name = input("Passenger Name: ").strip()
-            passenger_email = input("Passenger Email: ").strip()
-            passenger_phone = input("Passenger Phone: ").strip()
-            
-            try:
-                num_passengers = int(input("Number of Passengers: ").strip())
-            except ValueError:
-                print("Error: Number of passengers must be a number")
-                return
-            
-            booking_id = self.create_booking(
-                flight_id, passenger_name, passenger_email,
-                passenger_phone, num_passengers
-            )
-            
-            if booking_id:
-                proceed = input("\nProceed to payment? (yes/no): ").strip().lower()
-                if proceed == "yes":
-                    self._process_payment_for_booking(booking_id)
-        
-        except KeyboardInterrupt:
-            print("\nBooking cancelled")
-        except Exception as e:
-            print(f"Error: {str(e)}")
-    
-    def _payment_menu(self):
-        """Payment menu"""
-        print("\n" + "-"*70)
-        print("PAYMENT PROCESSING")
-        print("-"*70)
-        
-        try:
-            booking_id = input("Booking ID: ").strip().upper()
-            self._process_payment_for_booking(booking_id)
-        
-        except KeyboardInterrupt:
-            print("\nCancelled")
-        except Exception as e:
-            print(f"Error: {str(e)}")
-    
-    def _process_payment_for_booking(self, booking_id: str):
-        """Process payment for a specific booking"""
-        booking = self.database.get_booking_by_id(booking_id)
-        
-        if not booking:
-            print("Booking not found")
-            return
-        
-        print(f"\nBooking Amount: ${booking['total_price']:.2f}")
-        print("\nPayment Methods:")
-        print("1. Credit Card")
-        print("2. Debit Card")
-        print("3. PayPal")
-        print("4. Bank Transfer")
-        
-        method_choice = input("Select payment method (1-4): ").strip()
-        
-        method_map = {
-            "1": "CREDIT_CARD",
-            "2": "DEBIT_CARD",
-            "3": "PAYPAL",
-            "4": "BANK_TRANSFER"
+        passenger = {
+            "name": name.strip(),
+            "email": email.strip().lower(),
+            "phone": phone.strip(),
+            "dob": dob,
+            "passport": passport.strip().upper(),
+            "seat_number": seat_number
         }
         
-        payment_method = method_map.get(method_choice)
+        self.passengers.append(passenger)
+        return True
+    
+    def get_passengers(self) -> List[Dict]:
+        """Get all added passengers"""
+        return self.passengers
+    
+    def clear(self):
+        """Clear all passengers"""
+        self.passengers = []
+
+
+# ==================== PAYMENT PROCESSING ====================
+
+class PaymentProcessor:
+    """Handles payment processing and validation"""
+    
+    @staticmethod
+    def validate_payment_info(cardholder: str, card_number: str, 
+                             expiry: str, cvv: str) -> Tuple[bool, str]:
+        """Validate all payment information"""
+        # Validate cardholder name
+        is_valid, msg = Validator.validate_name(cardholder)
+        if not is_valid:
+            return False, f"Cardholder name: {msg}"
         
-        if not payment_method:
-            print("Invalid choice")
+        # Validate card number
+        is_valid, msg = Validator.validate_card_number(card_number)
+        if not is_valid:
+            return False, f"Card number: {msg}"
+        
+        # Validate expiry
+        is_valid, msg = Validator.validate_expiry(expiry)
+        if not is_valid:
+            return False, f"Expiry: {msg}"
+        
+        # Validate CVV
+        is_valid, msg = Validator.validate_cvv(cvv)
+        if not is_valid:
+            return False, f"CVV: {msg}"
+        
+        return True, "Payment information is valid"
+    
+    @staticmethod
+    def process_payment(amount: float, cardholder: str, card_number: str,
+                       expiry: str, cvv: str) -> Tuple[bool, str, str]:
+        """
+        Process payment
+        Returns: (success, message, transaction_id)
+        """
+        # Validate payment info
+        is_valid, msg = PaymentProcessor.validate_payment_info(
+            cardholder, card_number, expiry, cvv
+        )
+        if not is_valid:
+            return False, msg, ""
+        
+        # Simulate payment processing
+        if amount <= 0:
+            return False, "Amount must be greater than 0", ""
+        
+        if amount > 10000:
+            return False, "Amount exceeds maximum limit", ""
+        
+        # Generate transaction ID
+        transaction_id = PaymentProcessor._generate_transaction_id()
+        
+        # Simulate random payment failure (10% chance)
+        if random.random() < 0.1:
+            return False, "Payment declined by bank. Please try again.", ""
+        
+        return True, f"Payment of ${amount:.2f} processed successfully", transaction_id
+    
+    @staticmethod
+    def _generate_transaction_id() -> str:
+        """Generate a unique transaction ID"""
+        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+        random_suffix = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
+        return f"TXN-{timestamp}-{random_suffix}"
+
+
+# ==================== BOOKING CONFIRMATION ====================
+
+class BookingConfirmation:
+    """Handles booking confirmation and booking reference generation"""
+    
+    @staticmethod
+    def generate_booking_reference() -> str:
+        """Generate unique booking reference"""
+        timestamp = datetime.now().strftime("%Y%m%d")
+        random_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+        return f"BK{timestamp}{random_code}"
+    
+    @staticmethod
+    def create_booking(flight: Dict, passengers: List[Dict], 
+                      total_amount: float, transaction_id: str) -> Dict:
+        """Create a complete booking record"""
+        booking_ref = BookingConfirmation.generate_booking_reference()
+        booking = {
+            "booking_reference": booking_ref,
+            "booking_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "flight": {
+                "flight_id": flight['flight_id'],
+                "airline": flight['airline'],
+                "departure_city": flight['departure_city'],
+                "arrival_city": flight['arrival_city'],
+                "departure_time": flight['departure_time'],
+                "arrival_time": flight['arrival_time'],
+                "price_per_passenger": flight['price']
+            },
+            "passengers": passengers,
+            "total_passengers": len(passengers),
+            "total_amount": total_amount,
+            "transaction_id": transaction_id,
+            "status": "CONFIRMED",
+            "cancellation_fee": total_amount * 0.1  # 10% cancellation fee
+        }
+        return booking
+    
+    @staticmethod
+    def display_confirmation(booking: Dict):
+        """Display booking confirmation details"""
+        print("\n" + "="*60)
+        print("✈️  BOOKING CONFIRMATION".center(60))
+        print("="*60)
+        print(f"\n📌 Booking Reference: {booking['booking_reference']}")
+        print(f"📅 Booking Date: {booking['booking_date']}")
+        print(f"\n✈️  FLIGHT DETAILS:")
+        print(f"   Airline: {booking['flight']['airline']}")
+        print(f"   Route: {booking['flight']['departure_city']} → {booking['flight']['arrival_city']}")
+        print(f"   Departure: {booking['flight']['departure_time']}")
+        print(f"   Arrival: {booking['flight']['arrival_time']}")
+        print(f"   Price per Passenger: ${booking['flight']['price_per_passenger']:.2f}")
+        
+        print(f"\n👥 PASSENGERS ({booking['total_passengers']}):")
+        for i, passenger in enumerate(booking['passengers'], 1):
+            print(f"   {i}. {passenger['name']} (Seat: {passenger['seat_number']})")
+            print(f"      Passport: {passenger['passport']}")
+        
+        print(f"\n💰 PAYMENT DETAILS:")
+        print(f"   Transaction ID: {booking['transaction_id']}")
+        print(f"   Total Amount: ${booking['total_amount']:.2f}")
+        print(f"   Cancellation Fee (10%): ${booking['cancellation_fee']:.2f}")
+        print(f"   Refund Amount (if cancelled): ${booking['total_amount'] - booking['cancellation_fee']:.2f}")
+        
+        print(f"\n✅ Status: {booking['status']}")
+        print("="*60)
+        print("Thank you for booking with us! ✨")
+        print("="*60 + "\n")
+
+
+# ==================== BOOKING MANAGEMENT ====================
+
+class BookingManager:
+    """Manages all bookings"""
+    
+    def __init__(self):
+        self.bookings = DataManager.load_bookings()
+        self.flights = DataManager.load_flights()
+    
+    def add_booking(self, booking: Dict) -> bool:
+        """Add a new booking"""
+        self.bookings.append(booking)
+        return DataManager.save_bookings(self.bookings)
+    
+    def find_booking(self, booking_reference: str) -> Optional[Dict]:
+        """Find booking by reference"""
+        for booking in self.bookings:
+            if booking['booking_reference'].upper() == booking_reference.upper():
+                return booking
+        return None
+    
+    def get_bookings_by_email(self, email: str) -> List[Dict]:
+        """Get all bookings for an email address"""
+        results = []
+        for booking in self.bookings:
+            for passenger in booking['passengers']:
+                if passenger['email'].lower() == email.lower():
+                    results.append(booking)
+                    break
+        return results
+    
+    def cancel_booking(self, booking_reference: str, email: str) -> Tuple[bool, str]:
+        """Cancel a booking with refund calculation"""
+        booking = self.find_booking(booking_reference)
+        
+        if not booking:
+            return False, "❌ Booking not found"
+        
+        # Verify email matches a passenger
+        email_found = False
+        for passenger in booking['passengers']:
+            if passenger['email'].lower() == email.lower():
+                email_found = True
+                break
+        
+        if not email_found:
+            return False, "❌ Email does not match booking"
+        
+        if booking['status'] == 'CANCELLED':
+            return False, "❌ Booking is already cancelled"
+        
+        # Calculate refund
+        refund_amount = booking['total_amount'] - booking['cancellation_fee']
+        
+        # Update booking status
+        booking['status'] = 'CANCELLED'
+        booking['cancellation_date'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        booking['refund_amount'] = refund_amount
+        
+        # Update flight seats
+        flight_id = booking['flight']['flight_id']
+        for flight in self.flights:
+            if flight['flight_id'] == flight_id:
+                flight['available_seats'] += booking['total_passengers']
+                break
+        
+        # Save changes
+        DataManager.save_bookings(self.bookings)
+        DataManager.save_flights(self.flights)
+        
+        message = f"""✅ Booking Cancelled Successfully!
+   Booking Reference: {booking_reference}
+   Cancellation Fee: ${booking['cancellation_fee']:.2f}
+   Refund Amount: ${refund_amount:.2f}
+   Status: CANCELLED"""
+        
+        return True, message
+    
+    def update_flight_seats(self, flight_id: str, seats_to_book: int) -> bool:
+        """Update available seats for a flight"""
+        for flight in self.flights:
+            if flight['flight_id'] == flight_id:
+                if flight['available_seats'] >= seats_to_book:
+                    flight['available_seats'] -= seats_to_book
+                    DataManager.save_flights(self.flights)
+                    return True
+                return False
+        return False
+
+
+# ==================== MAIN FLIGHT BOOKING SYSTEM ====================
+
+class FlightBookingSystem:
+    """Main flight booking system orchestrator"""
+    
+    def __init__(self):
+        self.search = FlightSearch(DataManager.load_flights())
+        self.passengers = PassengerDetails()
+        self.booking_manager = BookingManager()
+        self.selected_flight: Optional[Dict] = None
+    
+    def display_menu(self):
+        """Display main menu"""
+        print("\n" + "="*60)
+        print("✈️  FLIGHT BOOKING SYSTEM".center(60))
+        print("="*60)
+        print("""
+1. Search Flights
+2. Add Passenger Details
+3. View Current Passengers
+4. Process Payment & Book
+5. View My Bookings
+6. Cancel Booking
+7. Exit
+
+""")
+    
+    def search_flights(self):
+        """Search for flights"""
+        print("\n" + "-"*60)
+        print("FLIGHT SEARCH".center(60))
+        print("-"*60)
+        
+        # Get available cities
+        cities = self.search.get_all_cities()
+        print(f"\nAvailable cities: {', '.join(cities)}\n")
+        
+        # Get departure city
+        while True:
+            departure = input("Enter departure city: ").strip()
+            if departure and departure in [c for c in cities if c.lower() == departure.lower()]:
+                departure = next(c for c in cities if c.lower() == departure.lower())
+                break
+            print("❌ Invalid city. Please try again.")
+        
+        # Get arrival city
+        while True:
+            arrival = input("Enter arrival city: ").strip()
+            if arrival and arrival in [c for c in cities if c.lower() == arrival.lower()]:
+                arrival = next(c for c in cities if c.lower() == arrival.lower())
+                break
+            print("❌ Invalid city. Please try again.")
+        
+        if departure.lower() == arrival.lower():
+            print("❌ Departure and arrival cities must be different")
             return
         
-        success, msg = self.process_booking_payment(booking_id, payment_method)
-        print(f"\n{msg}")
+        # Get travel date
+        while True:
+            date = input("Enter travel date (YYYY-MM-DD): ").strip()
+            is_valid, msg = Validator.validate_date(date)
+            if is_valid:
+                break
+            print(f"❌ {msg}")
+        
+        # Search flights
+        results = self.search.search(departure, arrival, date)
+        
+        if not results:
+            print(f"\n❌ No flights found from {departure} to {arrival} on {date}")
+            return
+        
+        # Display results
+        print(f"\n✅ Found {len(results)} flight(s):\n")
+        for idx, flight in enumerate(results, 1):
+            print(f"{idx}. {flight['airline']}")
+            print(f"   {flight['departure_city']} → {flight['arrival_city']}")
+            print(f"   Departure: {flight['departure_time']}")
+            print(f"   Arrival: {flight['arrival_time']}")
+            print(f"   Duration: {flight['duration']}")
+            print(f"   Price: ${flight['price']:.2f} per passenger")
+            print(f"   Available Seats: {flight['available_seats']}")
+            print()
+        
+        # Select flight
+        while True:
+            try:
+                choice = int(input("Select flight number (0 to cancel): "))
+                if choice == 0:
+                    return
+                if 1 <= choice <= len(results):
+                    self.selected_flight = results[choice - 1]
+                    print(f"\n✅ Flight {self.selected_flight['flight_id']} selected!")
+                    return
+                print("❌ Invalid selection")
+            except ValueError:
+                print("❌ Please enter a valid number")
     
-    def _view_booking_menu(self):
-        """View booking menu"""
-        print("\n" + "-"*70)
-        print("VIEW BOOKING")
-        print("-"*70)
+    def add_passenger(self):
+        """Add passenger details"""
+        if not self.selected_flight:
+            print("❌ Please select a flight first")
+            return
         
-        try:
-            booking_id = input("Enter Booking ID: ").strip().upper()
-            self.view_booking(booking_id)
+        max_passengers = min(5, self.selected_flight['available_seats'])
         
-        except KeyboardInterrupt:
-            print("\nCancelled")
-        except Exception as e:
-            print(f"Error: {str(e)}")
+        if len(self.passengers.get_passengers()) >= max_passengers:
+            print(f"❌ Maximum {max_passengers} passengers allowed")
+            return
+        
+        print(f"\n" + "-"*60)
+        print(f"ADD PASSENGER ({len(self.passengers.get_passengers()) + 1}/{max_passengers})".center(60))
+        print("-"*60)
+        
+        while True:
+            name = input("Full Name: ").strip()
+            is_valid, msg = Validator.validate_name(name)
+            if is_valid:
+                break
+            print(f"❌ {msg}")
+        
+        while True:
+            email = input("Email: ").strip()
+            is_valid, msg = Validator.validate_email(email)
+            if is_valid:
+                break
+            print(f"❌ {msg}")
+        
+        while True:
+            phone = input("Phone Number: ").strip()
+            is_valid, msg = Validator.validate_phone(phone)
+            if is_valid:
+                break
+            print(f"❌ {msg}")
+        
+        while True:
+            dob = input("Date of Birth (YYYY-MM-DD): ").strip()
+            is_valid, msg = Validator.validate_dob(dob)
+            if is_valid:
+                break
+            print(f"❌ {msg}")
+        
+        while True:
+            passport = input("Passport Number: ").strip()
+            is_valid, msg = Validator.validate_passport(passport)
+            if is_valid:
+                break
+            print(f"❌ {msg}")
+        
+        if self.passengers.add_passenger(name, email, phone, dob, passport):
+            print(f"✅ Passenger added successfully! ({len(self.passengers.get_passengers())}/{max_passengers})")
+        else:
+            print("❌ Failed to add passenger")
     
-    def _cancel_booking_menu(self):
-        """Cancel booking menu"""
-        print("\n" + "-"*70)
-        print("CANCEL BOOKING")
-        print("-"*70)
+    def view_passengers(self):
+        """View added passengers"""
+        passengers = self.passengers.get_passengers()
         
-        try:
-            booking_id = input("Enter Booking ID to Cancel: ").strip().upper()
+        if not passengers:
+            print("❌ No passengers added yet")
+            return
+        
+        print(f"\n" + "-"*60)
+        print("CURRENT PASSENGERS".center(60))
+        print("-"*60)
+        
+        for idx, passenger in enumerate(passengers, 1):
+            print(f"\n{idx}. {passenger['name']}")
+            print(f"   Email: {passenger['email']}")
+            print(f"   Phone: {passenger['phone']}")
+            print(f"   DOB: {passenger['dob']}")
+            print(f"   Passport: {passenger['passport']}")
+            print(f"   Seat: {passenger['seat_number']}")
+    
+    def process_booking(self):
+        """Complete booking with payment"""
+        if not self.selected_flight:
+            print("❌ Please select a flight first")
+            return
+        
+        passengers = self.passengers.get_passengers()
+        if not passengers:
+            print("❌ Please add at least one passenger")
+            return
+        
+        # Check seat availability
+        if not self.booking_manager.update_flight_seats(
+            self.selected_flight['flight_id'], 
+            len(passengers)
+        ):
+            print("❌ Not enough seats available")
+            return
+        
+        print(f"\n" + "-"*60)
+        print("PAYMENT DETAILS".center(60))
+        print("-"*60)
+        
+        # Calculate total
+        total_amount = self.selected_flight['price'] * len(passengers)
+        print(f"\nTotal Amount: ${total_amount:.2f}")
+        print(f"Number of Passengers: {len(passengers)}")
+        
+        # Get payment details
+        while True:
+            cardholder = input("\nCardholder Name: ").strip()
+            is_valid, msg = Validator.validate_name(cardholder)
+            if is_valid:
+                break
+            print(f"❌ {msg}")
+        
+        while True:
+            card_number = input("Card Number: ").strip()
+            is_valid, msg = Validator.validate_card_number(card_number)
+            if is_valid:
+                break
+            print(f"❌ {msg}")
+        
+        while True:
+            expiry = input("Expiry Date (MM/YY): ").strip()
+            is_valid, msg = Validator.validate_expiry(expiry)
+            if is_valid:
+                break
+            print(f"❌ {msg}")
+        
+        while True:
+            cvv = input("CVV: ").strip()
+            is_valid, msg = Validator.validate_cvv(cvv)
+            if is_valid:
+                break
+            print(f"❌ {msg}")
+        
+        # Process payment
+        print("\n⏳ Processing payment...")
+        success, message, transaction_id = PaymentProcessor.process_payment(
+            total_amount, cardholder, card_number, expiry, cvv
+        )
+        
+        if not success:
+            print(f"❌ {message}")
+            # Restore seat availability
+            self.selected_flight['available_seats'] += len(passengers)
+            DataManager.save_flights(self.booking_manager.flights)
+            return
+        
+        print(f"✅ {message}")
+        
+        # Create booking
+        booking = BookingConfirmation.create_booking(
+            self.selected_flight,
+            passengers,
+            total_amount,
+            transaction_id
+        )
+        
+        # Save booking
+        if self.booking_manager.add_booking(booking):
+            BookingConfirmation.display_confirmation(booking)
+            # Reset for next booking
+            self.passengers.clear()
+            self.selected_flight = None
+        else:
+            print("❌ Failed to save booking")
+    
+    def view_bookings(self):
+        """View bookings by email"""
+        print("\n" + "-"*60)
+        print("VIEW MY BOOKINGS".center(60))
+        print("-"*60)
+        
+        while True:
+            email = input("\nEnter your email: ").strip()
+            is_valid, msg = Validator.validate_email(email)
+            if is_valid:
+                break
+            print(f"❌ {msg}")
+        
+        bookings = self.booking_manager.get_bookings_by_email(email)
+        
+        if not bookings:
+            print(f"❌ No bookings found for {email}")
+            return
+        
+        print(f"\n✅ Found {len(bookings)} booking(s):\n")
+        
+        for booking in bookings:
+            status_symbol = "✅" if booking['status'] == "CONFIRMED" else "❌"
+            print(f"{status_symbol} Booking Reference: {booking['booking_reference']}")
+            print(f"   Flight: {booking['flight']['airline']} - {booking['flight']['departure_city']} → {booking['flight']['arrival_city']}")
+            print(f"   Departure: {booking['flight']['departure_time']}")
+            print(f"   Passengers: {booking['total_passengers']}")
+            print(f"   Total Amount: ${booking['total_amount']:.2f}")
+            print(f"   Status: {booking['status']}")
+            if booking['status'] == 'CANCELLED':
+                print(f"   Refund Amount: ${booking['refund_amount']:.2f}")
+            print()
+    
+    def cancel_booking(self):
+        """Cancel an existing booking"""
+        print("\n" + "-"*60)
+        print("CANCEL BOOKING".center(60))
+        print("-"*60)
+        
+        while True:
+            booking_ref = input("\nEnter booking reference: ").strip()
+            if booking_ref:
+                break
+            print("❌ Booking reference cannot be empty")
+        
+        while True:
+            email = input("Enter your email: ").strip()
+            is_valid, msg = Validator.validate_email(email)
+            if is_valid:
+                break
+            print(f"❌ {msg}")
+        
+        success, message = self.booking_manager.cancel_booking(booking_ref, email)
+        print(f"\n{message}")
+    
+    def run(self):
+        """Run the flight booking system"""
+        while True:
+            self.display_menu()
+            choice = input("Select an option (1-7): ").strip()
             
-            # Show booking details first
-            booking = self.database.get_booking_by_id(booking_id)
-            if booking:
-                self.view_booking(booking_id)
-                confirm = input("Are you sure you want to cancel this booking? (yes/no): ").strip().lower()
-                
-                if confirm == "yes":
-                    self.cancel_booking(booking_id)
+            if choice == '1':
+                self.search_flights()
+            elif choice == '2':
+                self.add_passenger()
+            elif choice == '3':
+                self.view_passengers()
+            elif choice == '4':
+                self.process_booking()
+            elif choice == '5':
+                self.view_bookings()
+            elif choice == '6':
+                self.cancel_booking()
+            elif choice == '7':
+                print("\n👋 Thank you for using Flight Booking System. Goodbye!")
+                break
             else:
-                print("Booking not found")
-        
-        except KeyboardInterrupt:
-            print("\nCancelled")
-        except Exception as e:
-            print(f"Error: {str(e)}")
+                print("❌ Invalid option. Please try again.")
 
 
-def main():
-    """Main entry point"""
-    try:
-        system = FlightBookingSystem()
-        system.run_interactive()
-    except KeyboardInterrupt:
-        print("\n\nApplication terminated by user.")
-    except Exception as e:
-        print(f"\nFatal error: {str(e)}")
-        raise
-
+# ==================== ENTRY POINT ====================
 
 if __name__ == "__main__":
-    main()
+    print("🚀 Initializing Flight Booking System...")
+    system = FlightBookingSystem()
+    system.run()
